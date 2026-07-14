@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 供应商质量协议生成与评审器
-读入结构化协议 JSON，生成 Markdown + 网页版 HTML（主色 #C8102E）。
+读入结构化协议 JSON，生成纯文字版 (.txt) + Markdown (.md) 双件文档。
 既支持"起草模板"，也支持"差距评审"（每条含现状状态与差距说明）。
 
 用法：
-  python build_report.py --input agreement.json --md-out 供应商质量协议.md --html-out 供应商质量协议.html
-  python build_report.py                                   # 内置小样本，直接产出差距评审示意双版
+  python build_report.py --input agreement.json --out-dir ./输出
+  python build_report.py                                   # 内置小样本，直接产出差距评审示意双件
 
 输入 JSON 结构：
 {
@@ -30,15 +30,9 @@
 
 import argparse
 import json
+import os
 import sys
-import html
 from datetime import datetime
-
-PRIMARY = "#C8102E"
-
-
-def esc(s):
-    return html.escape(str(s), quote=True)
 
 
 def load_agreement(path):
@@ -90,68 +84,46 @@ def build_md(a):
     return "\n".join(L)
 
 
-CSS = f"""
-:root{{--primary:{PRIMARY};--bg:#fafafa;--card:#ffffff;--ink:#1f2937;--muted:#6b7280;}}
-*{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
-  background:var(--bg);color:var(--ink);line-height:1.75;padding:32px}}
-.wrap{{max-width:980px;margin:0 auto}}
-header{{text-align:center;padding:26px 0 16px;border-bottom:3px solid var(--primary);margin-bottom:26px}}
-header h1{{font-size:27px}}
-header .meta{{color:var(--muted);font-size:14px;margin-top:10px}}
-.sec{{background:var(--card);border-radius:14px;padding:22px 26px;box-shadow:0 4px 16px rgba(0,0,0,.05);margin-bottom:20px}}
-.sec h2{{font-size:20px;margin-bottom:12px;border-left:5px solid var(--primary);padding-left:12px}}
-.clause{{border:1px solid #eee;border-radius:10px;padding:14px 18px;margin:12px 0}}
-.clause.core{{border-left:5px solid var(--primary)}}
-.clause h3{{font-size:16px;margin-bottom:6px}}
-.clause .badge{{display:inline-block;background:var(--primary);color:#fff;font-size:12px;border-radius:5px;padding:1px 7px;margin-left:6px}}
-.kp{{margin:4px 0 4px 20px;font-size:14px}}
-.st{{font-size:13px;margin-top:6px}}
-.st.included{{color:#16a34a}} .st.partial{{color:#d97706}} .st.missing{{color:var(--primary);font-weight:700}}
-.gap{{color:var(--muted);font-size:13px;margin-top:3px}}
-footer{{text-align:center;color:var(--muted);font-size:12px;margin-top:18px}}
-"""
-
-
-def clause_html(c, mode):
-    core_cls = " core" if c.get("core") else ""
-    badge = '<span class="badge">核心</span>' if c.get("core") else ""
-    kp = "\n".join(f"<li class='kp'>{esc(k)}</li>" for k in (c.get("key_points", []) or []))
-    extra = ""
-    if mode == "gap":
-        st = c.get("status", "")
-        stcn = STATUS_CN.get(st, st)
-        extra = (f"<div class='st {st}'>现状：{stcn}</div>"
-                 f"<div class='gap'>差距：{esc(c.get('gap','（无）'))}</div>")
-    return (f"<div class='clause{core_cls}'><h3>{esc(c.get('no',''))} {esc(c.get('title',''))}{badge}</h3>"
-            f"<ul>{kp}</ul>{extra}</div>")
-
-
-def build_html(a):
+def build_txt(a):
     mode = a.get("mode", "gap")
-    clauses_html = "\n".join(clause_html(c, mode) for c in (a.get("clauses", []) or []))
-    rec_html = "\n".join(f"<li>{esc(r)}</li>" for r in (a.get("recommendations", []) or ["（待企业补充）"]))
-    gap_sec = ""
+    sep = "=" * 48
+    sub = "-" * 48
+    L = []
+    L.append(sep)
+    L.append(a.get("agreement_title", "供应商质量协议"))
+    L.append(sep)
+    L.append(f"甲方：{a.get('party_a','')}")
+    L.append(f"乙方：{a.get('party_b','')}")
+    L.append(f"适用范围：{a.get('scope','')}")
+    L.append(f"模式：{'起草模板' if mode=='draft' else '差距评审'}")
+    L.append(f"生成日期：{datetime.now().strftime('%Y-%m-%d')}")
+    L.append("")
+    L.append("一、条款清单")
+    L.append(sub)
+    for c in a.get("clauses", []) or []:
+        tag = "【核心】" if c.get("core") else ""
+        L.append(f"{c.get('no','')} {c.get('title','')} {tag}")
+        L.append("关键要点：")
+        for kp in c.get("key_points", []) or []:
+            L.append(f"  - {kp}")
+        if mode == "gap":
+            st = STATUS_CN.get(c.get("status", ""), c.get("status", ""))
+            L.append(f"现状：{st}")
+            L.append(f"差距：{c.get('gap','（无）')}")
+        L.append("")
     if mode == "gap":
-        gap_sec = (f"<section class='sec'><h2>三、差距汇总</h2><p>{esc(a.get('gap_summary','（待企业补充）'))}</p></section>"
-                   f"<section class='sec'><h2>四、补全建议</h2><ul>{rec_html}</ul></section>")
-    return f"""<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{esc(a.get('agreement_title','供应商质量协议'))}</title>
-<style>{CSS}</style></head>
-<body><div class="wrap">
-<header>
-  <h1>{esc(a.get('agreement_title','供应商质量协议'))}</h1>
-  <div class="meta">甲方：{esc(a.get('party_a',''))} ｜ 乙方：{esc(a.get('party_b',''))} ｜ 模式：{'起草模板' if mode=='draft' else '差距评审'}</div>
-</header>
-<section class="sec"><h2>一、协议基本信息</h2>
-<p>适用范围：{esc(a.get('scope',''))}</p>
-<p>生成：{datetime.now().strftime('%Y-%m-%d')}</p></section>
-<section class="sec"><h2>二、条款清单</h2>{clauses_html}</section>
-{gap_sec}
-<footer>本报告由供应商质量协议技能生成 · {datetime.now().strftime('%Y-%m-%d %H:%M')}</footer>
-</div></body></html>"""
+        L.append("二、差距汇总")
+        L.append(sub)
+        L.append(a.get("gap_summary", "（待企业补充）"))
+        L.append("")
+        L.append("三、补全建议")
+        L.append(sub)
+        recs = a.get("recommendations", []) or ["（待企业补充）"]
+        for r in recs:
+            L.append(f"  - {r}")
+        L.append("")
+    L.append(f"本报告由供应商质量协议技能生成 · {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    return "\n".join(L)
 
 
 SAMPLE_AGREEMENT = {
@@ -194,10 +166,10 @@ SAMPLE_AGREEMENT = {
 
 
 def main():
-    ap = argparse.ArgumentParser(description="供应商质量协议生成与评审器")
+    ap = argparse.ArgumentParser(description="供应商质量协议生成与评审器（txt+md）")
     ap.add_argument("--input", help="结构化协议 JSON 路径（缺省使用内置小样本）")
-    ap.add_argument("--md-out", default="供应商质量协议.md", help="输出 MD 路径")
-    ap.add_argument("--html-out", default="供应商质量协议.html", help="输出 HTML 路径")
+    ap.add_argument("--out-dir", default=os.getcwd(), help="输出目录（默认当前工作目录）")
+    ap.add_argument("--format", choices=["txt", "md", "all"], default="all", help="输出格式，默认 all（txt+md）")
     args = ap.parse_args()
 
     try:
@@ -206,13 +178,20 @@ def main():
         sys.stderr.write(f"读取输入失败：{e}\n")
         sys.exit(1)
 
-    with open(args.md_out, "w", encoding="utf-8") as f:
-        f.write(build_md(agr))
-    sys.stderr.write(f"MD 已生成：{args.md_out}\n")
+    os.makedirs(args.out_dir, exist_ok=True)
+    date_tag = datetime.now().strftime("%Y%m%d")
+    base = f"供应商质量协议_{date_tag}"
 
-    with open(args.html_out, "w", encoding="utf-8") as f:
-        f.write(build_html(agr))
-    sys.stderr.write(f"HTML 已生成：{args.html_out}\n")
+    if args.format in ("md", "all"):
+        md_path = os.path.join(args.out_dir, base + ".md")
+        with open(md_path, "w", encoding="utf-8") as f:
+            f.write(build_md(agr))
+        sys.stderr.write(f"MD 已生成：{md_path}\n")
+    if args.format in ("txt", "all"):
+        txt_path = os.path.join(args.out_dir, base + ".txt")
+        with open(txt_path, "w", encoding="utf-8") as f:
+            f.write(build_txt(agr))
+        sys.stderr.write(f"TXT 已生成：{txt_path}\n")
 
 
 if __name__ == "__main__":

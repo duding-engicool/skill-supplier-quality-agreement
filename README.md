@@ -1,10 +1,10 @@
 # 供应商质量协议技能（supplier-quality-agreement）
 
-> 主色：#C8102E ｜ 范式：混合式（Markdown + HTML 双版）
+> 范式：交互引导式（纯文字版 .txt + Markdown .md）
 > 面向 SQE 与法务/商务的供应商质量协议起草与差距评审工具。
 
 ## 一句话说明
-覆盖质量协议五大核心条款（质量标准/不合格处理/索赔/审核权/变更通知），并自动生成条款模板与差距评审双版文档。
+覆盖质量协议五大核心条款（质量标准/不合格处理/索赔/审核权/变更通知），并自动生成条款模板与差距评审文档（txt+md）。
 
 ## 适用角色
 - SQE（供应商质量工程师）
@@ -28,15 +28,15 @@
 ## 文件清单
 - `SKILL.md`：技能主文件
 - `README.md`：本说明
-- `scripts/build_report.py`：协议 JSON → MD + HTML（支持起草/差距评审两种模式）
+- `scripts/build_report.py`：协议 JSON → 纯文字版 .txt + Markdown .md（支持起草/差距评审两种模式）
 
 ## 使用方法
 ```bash
-# 内置小样本直接跑通，产出差距评审示意双版
+# 内置小样本直接跑通，产出差距评审示意 txt+md 双件
 python scripts/build_report.py
 
 # 用自有数据（mode: draft 或 gap）
-python scripts/build_report.py --input agreement.json --md-out 供应商质量协议.md --html-out 供应商质量协议.html
+python scripts/build_report.py --input agreement.json --out-dir ./输出
 ```
 
 ## 联动技能
