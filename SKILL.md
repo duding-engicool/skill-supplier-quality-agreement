@@ -2,6 +2,8 @@
 name: supplier-quality-agreement
 description: 面向SQE与法务/商务的供应商质量协议（及客户质量条款）起草与评审技能；覆盖五大核心条款并自动生成条款模板与差距评审文档（txt+md）。
 version: 1.0.0
+slug: supplier-quality-agreement
+displayName: 供应商质量协议
 ---
 
 # 供应商质量协议生成与评审技能
